@@ -47,6 +47,13 @@
           "resizeMode": "contain",
           "backgroundColor": "#FDFBF7"
         }
+      ],
+      [
+        "with-rn-bluetooth-classic",
+        {
+          "peripheralUsageDescription": "Connect to your 58mm Bluetooth thermal printer to print order sticky notes.",
+          "alwaysUsageDescription": "Connect to your 58mm Bluetooth thermal printer to print order sticky notes."
+        }
       ]
     ],
     "experiments": {

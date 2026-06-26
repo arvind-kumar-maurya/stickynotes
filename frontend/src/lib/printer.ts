@@ -1,103 +1,171 @@
 // Bluetooth thermal printer adapter for 58mm ESC/POS printers.
 //
-// Uses `react-native-bluetooth-escpos-printer` (Januslo) — installed as a
-// project dependency. It is a NATIVE MODULE and ONLY links in custom
-// dev-client / production APK / IPA builds. It will NOT load in Expo Go.
+// Uses `react-native-bluetooth-classic` (modern, AndroidX, supports Expo SDK 54
+// New Architecture, has a proper config plugin via `with-rn-bluetooth-classic`).
+// The library is a NATIVE MODULE and only links in custom dev-client /
+// production APK / IPA builds — it will NOT load in Expo Go.
 //
 // We lazy-require it so the JS bundle still runs in Expo Go (the require
 // throws → caught → falls back to a clearly-labelled SIMULATED scan + print).
 // In a Publish-built APK the require succeeds and real Bluetooth printing
 // takes over automatically.
 
+import { Buffer } from "buffer";
 import { PermissionsAndroid, Platform } from "react-native";
 
 import type { SavedPrinter } from "./storage";
 
 type Device = { id: string; name: string };
 
-type NativeModule = {
+type NativeAdapter = {
   scan: () => Promise<Device[]>;
   connect: (id: string) => Promise<void>;
-  isConnected: () => Promise<boolean>;
-  printText: (text: string) => Promise<void>;
+  isConnected: (id: string) => Promise<boolean>;
+  write: (bytes: number[]) => Promise<void>;
   disconnect: () => Promise<void>;
 };
 
-function loadNative(): NativeModule | null {
+type BluetoothDeviceLike = {
+  address: string;
+  name?: string;
+  connect: (options?: Record<string, unknown>) => Promise<boolean>;
+  isConnected: () => Promise<boolean>;
+  write: (data: any, encoding?: string) => Promise<boolean>;
+  disconnect: () => Promise<boolean>;
+};
+
+function loadNative(): NativeAdapter | null {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require("react-native-bluetooth-escpos-printer");
-    const BluetoothManager = mod.BluetoothManager || mod.default?.BluetoothManager;
-    const BluetoothEscposPrinter = mod.BluetoothEscposPrinter || mod.default?.BluetoothEscposPrinter;
-    if (!BluetoothManager || !BluetoothEscposPrinter) return null;
+    const mod = require("react-native-bluetooth-classic");
+    const RNBluetoothClassic = mod.default || mod;
+    if (!RNBluetoothClassic || typeof RNBluetoothClassic.getBondedDevices !== "function") {
+      return null;
+    }
+
+    let activeDevice: BluetoothDeviceLike | null = null;
+
+    const findDevice = async (id: string): Promise<BluetoothDeviceLike | null> => {
+      try {
+        const bonded: BluetoothDeviceLike[] = await RNBluetoothClassic.getBondedDevices();
+        const hit = bonded.find((d) => d.address === id);
+        if (hit) return hit;
+      } catch {
+        /* ignore */
+      }
+      return null;
+    };
 
     return {
       scan: async () => {
-        // Android 12+ runtime permissions
         if (Platform.OS === "android") {
           try {
-            const required: string[] = [];
-            if (Platform.Version >= 31) {
-              required.push("android.permission.BLUETOOTH_SCAN");
-              required.push("android.permission.BLUETOOTH_CONNECT");
+            const perms: string[] = [];
+            if ((Platform.Version as number) >= 31) {
+              perms.push("android.permission.BLUETOOTH_SCAN");
+              perms.push("android.permission.BLUETOOTH_CONNECT");
             }
-            required.push("android.permission.ACCESS_FINE_LOCATION");
-            await PermissionsAndroid.requestMultiple(required as any);
+            perms.push("android.permission.ACCESS_FINE_LOCATION");
+            await PermissionsAndroid.requestMultiple(perms as any);
           } catch {
             /* ignore */
           }
         }
         try {
-          const enabled = await BluetoothManager.isBluetoothEnabled();
-          if (!enabled) await BluetoothManager.enableBluetooth();
-        } catch {
-          /* ignore */
-        }
-        const res = await BluetoothManager.scanDevices();
-        const parsed = typeof res === "string" ? JSON.parse(res) : res;
-        const paired: any[] = parsed?.paired || [];
-        const found: any[] = parsed?.found || [];
-        const all = [...paired, ...found].map((d: any) => ({
-          id: d.address || d.id,
-          name: d.name || d.address || "Unknown printer",
-        }));
-        const seen = new Set<string>();
-        return all.filter((d) => (d.id && !seen.has(d.id) ? (seen.add(d.id), true) : false));
-      },
-      connect: async (id: string) => {
-        await BluetoothManager.connect(id);
-      },
-      isConnected: async () => {
-        try {
-          if (typeof BluetoothManager.isDeviceConnected === "function") {
-            const s = await BluetoothManager.isDeviceConnected();
-            return !!s;
+          const enabled = await RNBluetoothClassic.isBluetoothEnabled();
+          if (!enabled) {
+            await RNBluetoothClassic.requestBluetoothEnabled();
           }
         } catch {
           /* ignore */
         }
-        // Library doesn't always expose a status check — assume connected once paired.
-        return true;
-      },
-      printText: async (text: string) => {
-        try {
-          await BluetoothEscposPrinter.printerInit?.();
-        } catch {
-          /* ignore */
+
+        const bonded: BluetoothDeviceLike[] = await RNBluetoothClassic.getBondedDevices();
+        const map = new Map<string, Device>();
+        for (const d of bonded) {
+          if (d?.address) map.set(d.address, { id: d.address, name: d.name || d.address });
         }
+
+        // Also try a quick discovery for unpaired devices. Cap it.
         try {
-          await BluetoothEscposPrinter.printerAlign?.(BluetoothEscposPrinter.ALIGN.LEFT);
+          const discovered: BluetoothDeviceLike[] = await Promise.race([
+            RNBluetoothClassic.startDiscovery(),
+            new Promise<BluetoothDeviceLike[]>((resolve) =>
+              setTimeout(() => resolve([]), 10000)
+            ),
+          ]);
+          for (const d of discovered || []) {
+            if (d?.address && !map.has(d.address)) {
+              map.set(d.address, { id: d.address, name: d.name || d.address });
+            }
+          }
         } catch {
-          /* ignore */
+          /* discovery is best-effort */
+        } finally {
+          try {
+            await RNBluetoothClassic.cancelDiscovery?.();
+          } catch {
+            /* ignore */
+          }
         }
-        await BluetoothEscposPrinter.printText(text, {});
+
+        return Array.from(map.values());
       },
+
+      connect: async (id: string) => {
+        // Prefer using the device wrapper if we can resolve it.
+        let device = await findDevice(id);
+        if (!device) {
+          // Library also exposes a top-level connect that takes an address.
+          try {
+            device = (await RNBluetoothClassic.connectToDevice(id, {
+              delimiter: "\n",
+            })) as BluetoothDeviceLike;
+          } catch (e) {
+            throw e;
+          }
+        } else {
+          await device.connect({ delimiter: "\n" });
+        }
+        activeDevice = device;
+      },
+
+      isConnected: async (id: string) => {
+        if (activeDevice && activeDevice.address === id) {
+          try {
+            return await activeDevice.isConnected();
+          } catch {
+            return false;
+          }
+        }
+        // Try recovering a device handle (after process restart we lose it,
+        // but the OS-level pairing persists — treat as needs-reconnect).
+        const dev = await findDevice(id);
+        if (!dev) return false;
+        try {
+          const connected = await dev.isConnected();
+          if (connected) activeDevice = dev;
+          return connected;
+        } catch {
+          return false;
+        }
+      },
+
+      write: async (bytes: number[]) => {
+        if (!activeDevice) throw new Error("Printer not connected");
+        const base64 = Buffer.from(bytes).toString("base64");
+        // react-native-bluetooth-classic accepts a base64 string with "base64"
+        // hint, or a raw Buffer. base64 string is the safest cross-platform.
+        await activeDevice.write(base64, "base64");
+      },
+
       disconnect: async () => {
         try {
-          await BluetoothManager.disconnect?.();
+          await activeDevice?.disconnect();
         } catch {
           /* ignore */
         }
+        activeDevice = null;
       },
     };
   } catch {
@@ -105,14 +173,14 @@ function loadNative(): NativeModule | null {
   }
 }
 
-let native: NativeModule | null = null;
+let nativeAdapter: NativeAdapter | null = null;
 let nativeChecked = false;
-function getNative(): NativeModule | null {
+function getNative(): NativeAdapter | null {
   if (!nativeChecked) {
     nativeChecked = true;
-    native = loadNative();
+    nativeAdapter = loadNative();
   }
-  return native;
+  return nativeAdapter;
 }
 
 export function isNativePrinterAvailable(): boolean {
@@ -145,7 +213,7 @@ export async function connectPrinter(id: string): Promise<void> {
 export async function isPrinterConnected(p: SavedPrinter | null): Promise<boolean> {
   if (!p) return false;
   const n = getNative();
-  if (n) return n.isConnected();
+  if (n) return n.isConnected(p.id);
   return simulatedConnectedId === p.id;
 }
 
@@ -155,24 +223,45 @@ export async function disconnectPrinter(): Promise<void> {
   simulatedConnectedId = null;
 }
 
-/**
- * Build the formatted receipt text for a 58mm printer (32 chars / line).
- */
-export function buildReceiptText(opts: {
+// ---------- ESC/POS command builders ----------
+// Generic 58mm ESC/POS printer commands. Width = 32 characters at default font.
+const ESC = 0x1b;
+const GS = 0x1d;
+const LF = 0x0a;
+
+function encodeText(s: string): number[] {
+  // CP437 / Latin-1 fits the Hinglish (Roman script) we generate.
+  return Array.from(Buffer.from(s, "latin1"));
+}
+
+function commandInit(): number[] {
+  return [ESC, 0x40]; // ESC @ – initialize
+}
+function commandAlign(mode: 0 | 1 | 2): number[] {
+  // 0 = left, 1 = center, 2 = right
+  return [ESC, 0x61, mode];
+}
+function commandBold(on: boolean): number[] {
+  return [ESC, 0x45, on ? 1 : 0];
+}
+function commandFeed(lines: number): number[] {
+  return [ESC, 0x64, Math.max(0, Math.min(255, lines))];
+}
+function commandCut(): number[] {
+  // Many 58mm cheap printers don't actually have a cutter — this is harmless
+  // when absent (printer ignores unknown commands).
+  return [GS, 0x56, 0x00];
+}
+
+function buildEscPosBytes(opts: {
   kitchenName: string;
   customerName: string;
   orderNumber: number;
   quote: string;
-}) {
+}): number[] {
   const W = 32;
-  const center = (s: string) => {
-    const t = s.length > W ? s.slice(0, W) : s;
-    const pad = Math.max(0, Math.floor((W - t.length) / 2));
-    return " ".repeat(pad) + t;
-  };
-  const line = "-".repeat(W);
-  const wrap = (s: string) => {
-    return s
+  const wrap = (s: string) =>
+    s
       .split("\n")
       .map((para) => {
         const words = para.split(/\s+/);
@@ -190,7 +279,58 @@ export function buildReceiptText(opts: {
         return lines.join("\n");
       })
       .join("\n");
+  const date = new Date();
+  const stamp = `${date.toLocaleDateString()}  ${date.toLocaleTimeString()}`;
+  const line = "-".repeat(W);
+
+  let bytes: number[] = [];
+  bytes = bytes.concat(commandInit());
+
+  // Header
+  bytes = bytes.concat(commandAlign(1), commandBold(true));
+  bytes = bytes.concat(encodeText(opts.kitchenName.toUpperCase()), [LF]);
+  bytes = bytes.concat(commandBold(false));
+  bytes = bytes.concat(encodeText("Good Food, Happy Mood"), [LF]);
+  bytes = bytes.concat(encodeText(line), [LF]);
+
+  // Order info
+  bytes = bytes.concat(commandAlign(0));
+  bytes = bytes.concat(encodeText(`Order #${opts.orderNumber}`), [LF]);
+  bytes = bytes.concat(encodeText(`For: ${opts.customerName}`), [LF]);
+  bytes = bytes.concat(encodeText(stamp), [LF]);
+  bytes = bytes.concat(encodeText(line), [LF]);
+
+  // Quote (the heart of the receipt)
+  bytes = bytes.concat(encodeText(wrap(opts.quote)), [LF]);
+  bytes = bytes.concat(encodeText(line), [LF]);
+
+  // Footer
+  bytes = bytes.concat(commandAlign(1));
+  bytes = bytes.concat(encodeText("Thank you!"), [LF]);
+
+  // Feed + cut
+  bytes = bytes.concat(commandFeed(4));
+  bytes = bytes.concat(commandCut());
+
+  return bytes;
+}
+
+/**
+ * Visual receipt text (used for in-app preview / logs).
+ */
+export function buildReceiptText(opts: {
+  kitchenName: string;
+  customerName: string;
+  orderNumber: number;
+  quote: string;
+}) {
+  const W = 32;
+  const center = (s: string) => {
+    const t = s.length > W ? s.slice(0, W) : s;
+    const pad = Math.max(0, Math.floor((W - t.length) / 2));
+    return " ".repeat(pad) + t;
   };
+  const line = "-".repeat(W);
   const date = new Date();
   const stamp = `${date.toLocaleDateString()}  ${date.toLocaleTimeString()}`;
   return (
@@ -206,7 +346,7 @@ export function buildReceiptText(opts: {
     `${stamp}\n` +
     line +
     `\n` +
-    wrap(opts.quote) +
+    opts.quote +
     `\n` +
     line +
     `\n` +
@@ -221,14 +361,14 @@ export async function printReceipt(opts: {
   orderNumber: number;
   quote: string;
 }): Promise<{ ok: true; simulated: boolean }> {
-  const text = buildReceiptText(opts);
   const n = getNative();
   if (n) {
-    await n.printText(text);
+    const bytes = buildEscPosBytes(opts);
+    await n.write(bytes);
     return { ok: true, simulated: false };
   }
   // eslint-disable-next-line no-console
-  console.log("[SFJ][SIMULATED PRINT]\n" + text);
+  console.log("[SFJ][SIMULATED PRINT]\n" + buildReceiptText(opts));
   await new Promise((r) => setTimeout(r, 700));
   return { ok: true, simulated: true };
 }
