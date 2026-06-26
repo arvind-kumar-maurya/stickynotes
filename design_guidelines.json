@@ -1,0 +1,159 @@
+{
+  "app_name": "KitchenNotes",
+  "personality": "8 Hand-Drawn / Journal",
+  "personality_one_liner": "A warm, paper-like, tactile experience that feels like a personal chef writing a friendly note.",
+  "color": {
+    "surface": "#FDFBF7",
+    "onSurface": "#2D2A26",
+    "surfaceSecondary": "#F4EFE6",
+    "onSurfaceSecondary": "#3D3A36",
+    "surfaceTertiary": "#EAE4D9",
+    "onSurfaceTertiary": "#4D4A46",
+    "surfaceInverse": "#2D2A26",
+    "onSurfaceInverse": "#FDFBF7",
+    "brand": "#E8B831",
+    "brandPrimary": "#E8B831",
+    "onBrandPrimary": "#2D2A26",
+    "brandSecondary": "#D9734E",
+    "onBrandSecondary": "#FDFBF7",
+    "brandTertiary": "#F7E5A9",
+    "onBrandTertiary": "#2D2A26",
+    "success": "#658A64",
+    "onSuccess": "#FDFBF7",
+    "warning": "#E8B831",
+    "onWarning": "#2D2A26",
+    "error": "#C65D47",
+    "onError": "#FDFBF7",
+    "info": "#8C857B",
+    "onInfo": "#FDFBF7",
+    "border": "#E0D8C8",
+    "borderStrong": "#C2B8A3",
+    "divider": "#EAE4D9"
+  },
+  "typography": {
+    "displayFontFamily": "Fraunces",
+    "textFontFamily": "Nunito",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous, breathable, paper-like margins. Avoid dense stacking. Keep padding soft and elements distinctly separated.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": "1",
+  "navigation": "stack_only",
+  "icon_set": "Ionicons",
+  "glassmorphism": {
+    "enabled": false,
+    "do's": [],
+    "dont's": [
+      "No glassmorphism. This app relies on tactile paper, solid soft colors, and ink. Blur effects break the hand-drawn/journal aesthetic."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "SetupScreen",
+      "purpose": "First-launch onboarding to capture Gemini API key and Kitchen Brand Name.",
+      "states": {
+        "loading": "Centered spinner using brandPrimary color.",
+        "empty": "N/A",
+        "error": "Inline error text below inputs in faded clay red (#C65D47)."
+      },
+      "layout": "Hero image at the top featuring a cloud kitchen context (image tinted with a top-to-bottom gradient scrim). Large Fraunces greeting 'Let's set up your kitchen'. Two spacious text inputs (surfaceTertiary background, Nunito font) for 'Kitchen Name' and 'Gemini API Key'. A sticky 'Save & Continue' button pinned to the bottom of the screen."
+    },
+    {
+      "name": "PrinterSetupScreen",
+      "purpose": "Scan, list, and pair with the 58mm Bluetooth thermal printer. Shown automatically if not connected.",
+      "states": {
+        "loading": "Pulsing printer icon at the top with 'Searching for nearby thermal printers...'",
+        "empty": "Illustration of a printer with 'No printers found nearby. Is it powered on?' and a 'Retry' button.",
+        "error": "Toast or inline message 'Connection failed. Please ensure the printer is awake.'"
+      },
+      "layout": "Zero-Click Discovery style. Header with 'Connect Printer'. If scanning, a pulsing icon. Discovered devices populate as a vertical list of cards (surfaceSecondary). Each card has a printer icon, device name (bold), and a 'Connect' button (brandPrimary pill). Footer has a subtle 'Skip for now' or troubleshooting link."
+    },
+    {
+      "name": "MainInputScreen",
+      "purpose": "Capture the customer's name and current order number to generate the quote.",
+      "states": {
+        "loading": "N/A",
+        "empty": "N/A",
+        "error": "Red inline text if Name is left empty."
+      },
+      "layout": "Highly focused, minimalist paper desk feel. 'Who is this order for?' heading. A large, oversized input for the Customer Name. Below it, a stepper or input for Order Number (defaults to 1). A large, sticky 'Generate Sticky Note' button pinned to the bottom."
+    },
+    {
+      "name": "PreviewScreen",
+      "purpose": "Display the generated Hinglish quote on a digital sticky note, with actions to regenerate or print.",
+      "states": {
+        "loading": "The sticky note is visible but blank, with a soft pencil-scribble loading animation or a spinner in the center.",
+        "empty": "N/A",
+        "error": "Sticky note shows a 'Failed to generate quote' message with a 'Try Again' button."
+      },
+      "layout": "Background is 'surface'. Centerpiece is a large 'brandTertiary' (#F7E5A9) square card representing the sticky note, styled with a slight rotation (-2deg) and shadow tier 2 to look like a real physical note. The text inside MUST use a handwritten font (e.g., Caveat or Kalam) in 'onSurface' color. Below the note, two large buttons arranged vertically or side-by-side: a 'Regenerate' button (brandSecondary/terracotta) and a 'Print to 58mm' button (brandPrimary/mustard, sticky at bottom)."
+    },
+    {
+      "name": "SettingsScreen",
+      "purpose": "Allow the owner to update the Gemini Key, Kitchen Name, or select a new Printer.",
+      "states": {
+        "loading": "N/A",
+        "empty": "N/A",
+        "error": "N/A"
+      },
+      "layout": "Standard list layout with generous padding. Sections for 'API Configuration' and 'Printer Settings'. Includes a 'Disconnect Printer' or 'Find New Printer' row with a tinted icon container. Changes auto-save."
+    }
+  ],
+  "images": {
+    "hero_kitchen": {
+      "url": "https://images.pexels.com/photos/4393657/pexels-photo-4393657.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "alt": "A delivery worker packing food containers in a cloud kitchen."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Use Personality 8 (Hand-Drawn / Journal) to create a warm, tactile, paper-like interface.",
+    "Do NOT use any blue, purple, or indigo colors. Stick to the provided palette: warm off-white (paper), charcoal (ink), mustard/yellow (sticky note), and terracotta (accent).",
+    "For the Sticky Note in 'PreviewScreen', it is CRITICAL to load and use a handwritten Google Font like 'Caveat' or 'Kalam' for the quote text. This sells the 'personal chef note' illusion.",
+    "Apply a slight rotation (e.g., transform: [{ rotate: '-2deg' }]) and shadow to the sticky note view to make it feel like a physical piece of paper sitting on the desk.",
+    "No glassmorphism. Use solid colors and soft shadows.",
+    "For Bluetooth printing, recommend a library like 'react-native-thermal-receipt-printer-image-qr' to handle 58mm ESC/POS commands.",
+    "Gemini Prompt Instructions: Ensure the prompt sent to the Gemini 2.5 Flash model explicitly asks for 'Hinglish', 'warm/funny/motivational', 'under 3 lines', and incorporates the Kitchen Name, Customer Name, and Order Number.",
+    "Do not use Emojis anywhere in the UI chrome. Use Ionicons with the 'outline' style for a delicate, drawn feel.",
+    "Always apply a top-to-bottom gradient scrim over the 'hero_kitchen' image on the Setup Screen to ensure text placed over it remains highly legible."
+  ],
+  "haptics": {
+    "events": {
+      "button_press": "light",
+      "generate_success": "success",
+      "print_start": "medium",
+      "printer_connected": "success"
+    }
+  }
+}
