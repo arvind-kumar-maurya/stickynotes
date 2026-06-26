@@ -11,7 +11,7 @@
 // takes over automatically.
 
 import { Buffer } from "buffer";
-import { PermissionsAndroid, Platform } from "react-native";
+import { NativeModules, PermissionsAndroid, Platform } from "react-native";
 
 import type { SavedPrinter } from "./storage";
 
@@ -35,6 +35,10 @@ type BluetoothDeviceLike = {
 };
 
 function loadNative(): NativeAdapter | null {
+  // The JS wrapper of react-native-bluetooth-classic exports its methods even
+  // when the underlying NATIVE TurboModule isn't linked (Expo Go, web). The
+  // real availability gate is whether the native module is registered.
+  if (!NativeModules?.RNBluetoothClassic) return null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require("react-native-bluetooth-classic");

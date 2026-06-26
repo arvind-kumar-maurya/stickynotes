@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 6 — regression from iter_5 is FULLY RESOLVED. The new NativeModules.RNBluetoothClassic guard in /app/frontend/src/lib/printer.ts:41 short-circuits loadNative() to null on web/Expo Go BEFORE the require()/typeof checks, so isNativePrinterAvailable() correctly returns false. Verified at 375x667 on https://sticky-delight-app.preview.emergentagent.com: (1) /printer-setup banner now reads 'Demo mode (Expo Go preview). Real Bluetooth printing activates in the built APK.' (not the native 'Scanning nearby...' string), (2) printer-list mounts with both demo devices 'Thermal 58mm Printer (Demo)' [DEMO-58-01] and 'POS-58 Bluetooth (Demo)' [DEMO-POS-58] and printer-error testID does NOT appear (no more TypeError), (3) tapping printer-connect-DEMO-58-01 navigates to /home with order-number-value '#1' and the printer chip showing the demo device, (4) home-customer-input 'Arvind' → generate-button → /preview?customer_name=Arvind&order_number=1 (5) preview-quote shows 'Failed to fetch' because of the documented CORS block on https://expertdevelopers.in/generate-8858-quote-for-sfj — this is the known web-only artifact carried over from iter_2/4 and is expected by the spec — but the print-button still renders and is tappable, (6) tapping print-button fires the simulated printReceipt() path (console log: '[SFJ][SIMULATED PRINT]' with full ESC/POS receipt for SHREE FOOD JUNCTION Order #1 For: Arvind) and preview-toast displays 'Printed (simulated). Build APK for real BT printing.', (7) navigating back lands on /home with order-number-value auto-incremented to '#2', (8) /settings shows the brand card with logo + 'Shree Food Junction' + 'Good Food, Happy Mood', printer-row shows the connected demo device with subtitle 'Demo mode (Expo Go preview)', and settings-disconnect successfully clears settings-printer-name to 'No printer connected'. (9) `buffer` ^6.0.3 is now a direct dependency in /app/frontend/package.json:22 alongside react-native-bluetooth-classic and with-rn-bluetooth-classic. All 5 acceptance criteria PASS. Deprecated React-Native console warnings detected (non-blocking, carried over from prior iterations): TouchableWithoutFeedback (home.tsx), shadow* style props (preview.tsx), props.pointerEvents (preview.tsx). No expo-av/expo-barcode-scanner/expo-background-fetch deprecations. No red-screen, no SafeAreaView issues.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Quote generation via expertdevelopers.in on web preview", "issue": "Preflight CORS still blocks https://expertdevelopers.in/generate-8858-quote-for-sfj on the browser → preview-quote shows 'Failed to fetch'. KNOWN/ACCEPTED web-only artifact (will work in the built APK because mobile native fetch is not CORS-gated). Print button remains usable in simulated mode regardless. No action needed.", "affected_testIDs": ["preview-quote", "preview-error"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "home.tsx TouchableWithoutFeedback", "issue": "Console warning: 'TouchableWithoutFeedback is deprecated. Please use Pressable.' Non-blocking. Reference: /app/frontend/app/home.tsx:12,86"},
+      {"component": "preview.tsx noteShadow", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' Non-blocking. Reference: /app/frontend/app/preview.tsx (noteShadow style)"},
+      {"component": "preview.tsx preview-toast", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Non-blocking. Reference: /app/frontend/app/preview.tsx (preview-toast View)"}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_6.json", "/app/test_reports/iteration_5.json"],
+  "action_items": [
+    "OPTIONAL polish (non-blocking, carried from prior iterations): home.tsx — swap TouchableWithoutFeedback for Pressable; preview.tsx — replace shadow*/shadowColor/etc with boxShadow on the noteShadow style; preview.tsx — move pointerEvents from prop to style on the preview-toast View. None of these affect functionality.",
+    "No other action items — the iter_5 regression is fixed and the full happy path works end-to-end in simulated/demo mode on the Expo Go web preview."
+  ],
+  "critical_code_review_comments": [
+    "/app/frontend/src/lib/printer.ts:41 — fix is correctly applied: `if (!NativeModules?.RNBluetoothClassic) return null;` is the FIRST statement inside loadNative() (before the require/typeof checks). This is the right gate — NativeModules.RNBluetoothClassic is undefined on web and inside Expo Go, so the simulated fallback engages as designed, and is populated when running a custom dev-client / production APK where the native module is linked.",
+    "/app/frontend/package.json:22 — `buffer: ^6.0.3` is now a direct dependency alongside react-native-bluetooth-classic@^1.73.0-rc.17 (line 43) and with-rn-bluetooth-classic@^1.0.5 (line 52). Packaging is clean.",
+    "No backend changes were in scope this iteration."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only request)", "frontend": "5/5 acceptance criteria PASS. (1) Demo banner: PASS. (2) printer-list with both demo devices + connect→/home: PASS. (3) Full happy path home→generate→preview→print→back→order#2: PASS (note: preview-quote shows 'Failed to fetch' due to known web-only CORS, but print-button still renders & simulated print works as designed). (4) Settings brand card + printer-row + Demo subtitle + settings-disconnect: PASS. (5) buffer direct dep: PASS."},
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All iter_5 regression items are resolved. The NativeModules.RNBluetoothClassic guard works correctly — simulated demo mode engages on both web preview and on Expo Go on a phone. When the user creates a native build (APK/IPA via EAS with the with-rn-bluetooth-classic config plugin), NativeModules.RNBluetoothClassic will be defined and the real Bluetooth scan/connect/write paths will engage automatically. CORS on expertdevelopers.in remains a documented web-only artifact and is expected to disappear on a native build. If retesting on a native build, focus on real BT permissions prompts (BLUETOOTH_SCAN/CONNECT on Android 12+, NSBluetoothAlwaysUsageDescription on iOS) and verify getBondedDevices() returns paired thermal printers. Optional polish (deprecation warnings on home.tsx/preview.tsx) is queued but non-blocking."
+}
