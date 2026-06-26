@@ -1,10 +1,14 @@
-// Direct call to the Shree Food Junction quote API. No backend, no Gemini key.
-// The endpoint is read from EXPO_PUBLIC_QUOTE_API_URL so it can be swapped via
-// env on production deploys; the value below is the production default the
-// user has set up on their own server.
-const QUOTE_ENDPOINT =
-  process.env.EXPO_PUBLIC_QUOTE_API_URL ||
-  "https://expertdevelopers.in/generate-8858-quote-for-sfj";
+// Quote API endpoint. Read from env (set in frontend/.env as
+// EXPO_PUBLIC_QUOTE_API_URL) so it can be swapped per environment / deploy.
+const QUOTE_ENDPOINT = process.env.EXPO_PUBLIC_QUOTE_API_URL;
+
+if (!QUOTE_ENDPOINT) {
+  // Fail fast at module load so a missing env var is obvious in dev/build.
+  // eslint-disable-next-line no-console
+  console.error(
+    "[api] EXPO_PUBLIC_QUOTE_API_URL is not set. Set it in frontend/.env."
+  );
+}
 
 export type GenerateQuoteResponse = {
   quote: string;
@@ -18,6 +22,9 @@ export async function generateQuote(input: {
   order_number: number;
   kitchen_name: string;
 }): Promise<GenerateQuoteResponse> {
+  if (!QUOTE_ENDPOINT) {
+    throw new Error("Quote API URL not configured (EXPO_PUBLIC_QUOTE_API_URL).");
+  }
   const res = await fetch(QUOTE_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
