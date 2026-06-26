@@ -1,16 +1,40 @@
-import { Text, View, StyleSheet, Image } from "react-native";
+import { useEffect } from "react";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { useRouter } from "expo-router";
 
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import { theme } from "@/src/lib/theme";
+import { getGeminiKey, getKitchenName, getPrinter } from "@/src/lib/storage";
+import { isPrinterConnected } from "@/src/lib/printer";
 
 export default function Index() {
-  console.log(EXPO_PUBLIC_BACKEND_URL, "EXPO_PUBLIC_BACKEND_URL");
+  const router = useRouter();
+
+  useEffect(() => {
+    (async () => {
+      const [key, kitchen, printer] = await Promise.all([
+        getGeminiKey(),
+        getKitchenName(),
+        getPrinter(),
+      ]);
+
+      if (!key || !kitchen) {
+        router.replace("/setup");
+        return;
+      }
+
+      const connected = await isPrinterConnected(printer);
+      if (!printer || !connected) {
+        router.replace("/printer-setup");
+        return;
+      }
+
+      router.replace("/home");
+    })();
+  }, []);
 
   return (
-    <View style={styles.container}>
-      <Image
-        source={require("../assets/images/app-image.png")}
-        style={styles.image}
-      />
+    <View style={styles.container} testID="index-bootstrap">
+      <ActivityIndicator size="large" color={theme.color.brandPrimary} />
     </View>
   );
 }
@@ -18,13 +42,8 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0c0c0c",
+    backgroundColor: theme.color.surface,
     alignItems: "center",
     justifyContent: "center",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
   },
 });
