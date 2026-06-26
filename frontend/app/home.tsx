@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 
 import { theme } from "@/src/lib/theme";
 import {
@@ -33,13 +33,22 @@ export default function HomeScreen() {
   const [printer, setPrinterState] = useState<SavedPrinter | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const [n, p] = await Promise.all([getOrderNumber(), getPrinter()]);
-      setOrder(n || 1);
-      setPrinterState(p);
-    })();
-  }, []);
+  // Re-load order # and printer every time this screen comes into focus,
+  // so the stepper reflects the latest value after Print bumps it on /preview.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      (async () => {
+        const [n, p] = await Promise.all([getOrderNumber(), getPrinter()]);
+        if (!alive) return;
+        setOrder(n || 1);
+        setPrinterState(p);
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [])
+  );
 
   const onGenerate = async () => {
     const name = customer.trim();
