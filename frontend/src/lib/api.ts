@@ -1,5 +1,10 @@
 // Direct call to the Shree Food Junction quote API. No backend, no Gemini key.
-const QUOTE_ENDPOINT = "https://expertdevelopers.in/generate-8858-quote-for-sfj";
+// The endpoint is read from EXPO_PUBLIC_QUOTE_API_URL so it can be swapped via
+// env on production deploys; the value below is the production default the
+// user has set up on their own server.
+const QUOTE_ENDPOINT =
+  process.env.EXPO_PUBLIC_QUOTE_API_URL ||
+  "https://expertdevelopers.in/generate-8858-quote-for-sfj";
 
 export type GenerateQuoteResponse = {
   quote: string;
