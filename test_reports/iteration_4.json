@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration 4 — regression-verified the env-var migration of the quote API URL. PASS on all 4 criteria. (1) /app/frontend/.env line 7 contains EXPO_PUBLIC_QUOTE_API_URL=https://expertdevelopers.in/generate-8858-quote-for-sfj alongside the existing Expo packager vars; no protected var was touched. (2) /app/frontend/src/lib/api.ts:3 reads `const QUOTE_ENDPOINT = process.env.EXPO_PUBLIC_QUOTE_API_URL` with NO hardcoded fallback (no `||` default), and generateQuote() throws `Quote API URL not configured (EXPO_PUBLIC_QUOTE_API_URL).` when the var is missing — fail-fast confirmed by code read. (3) End-to-end run on the preview URL at 375x667: cleared localStorage → /printer-setup → tapped printer-connect-DEMO-58-01 → landed on /home with order-number-value='#1' → typed 'Arvind' into home-customer-input → tapped generate-button → routed to /preview?customer_name=Arvind&order_number=1 → a POST to EXACTLY https://expertdevelopers.in/generate-8858-quote-for-sfj was observed by Playwright's request interceptor (confirms the env var resolved through Expo's EXPO_PUBLIC_* compile-time inlining — no hardcoded constant). Tapped print-button → preview-toast 'Printed (simulated). Build APK for real BT printing.' rendered → tapped preview-back → /home order-number-value='#2' ✅. (4) No compilation errors, no missing-import errors, no runtime/red-screen crash. Supervisor log confirms `env: export ... EXPO_PUBLIC_QUOTE_API_URL` on Expo start. The known web-preview-only CORS block on expertdevelopers.in (preflight 'No Access-Control-Allow-Origin') causes preview-quote to fall back to preview-error='Failed to fetch' as documented and accepted by the request; this is a browser-sandbox artifact, not a code defect — the POST URL/payload were both observed to be correct. Deprecated packages detected: none. SafeAreaView issues detected: none.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "home.tsx TouchableWithoutFeedback", "issue": "Console warning: 'TouchableWithoutFeedback is deprecated. Please use Pressable.' Non-blocking; carried over from iteration_2/3. Reference: /app/frontend/app/home.tsx:12,86"},
+      {"component": "preview.tsx noteShadow", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' Non-blocking; carried over. Reference: /app/frontend/app/preview.tsx:275-279"},
+      {"component": "preview.tsx preview-toast", "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Non-blocking; carried over. Reference: /app/frontend/app/preview.tsx:215"}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_4.json", "/app/test_reports/iteration_3.json"],
+  "action_items": [
+    "None blocking for the env-var migration — fully verified, ship as-is.",
+    "OPTIONAL polish (carried from iter 2/3, still non-blocking): swap TouchableWithoutFeedback → Pressable on home.tsx, swap shadow* → boxShadow on preview.tsx noteShadow, move pointerEvents from prop to style on preview-toast."
+  ],
+  "critical_code_review_comments": [
+    "/app/frontend/src/lib/api.ts:3-11 — Correct fail-fast pattern: top-level read of process.env.EXPO_PUBLIC_QUOTE_API_URL with a console.error at module load AND a runtime throw inside generateQuote(). Note that Expo inlines EXPO_PUBLIC_* at bundle time, so the throw cannot fire after a successful build that included the env var — but the safety net is correct for dev/missing-config scenarios.",
+    "/app/frontend/.env:7 — env var name follows the mandatory EXPO_PUBLIC_ prefix so it gets inlined into the JS bundle. Confirmed exported by Metro on Expo start (`env: export ... EXPO_PUBLIC_QUOTE_API_URL`)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only request)", "frontend": "4/4 acceptance criteria pass. POST to https://expertdevelopers.in/generate-8858-quote-for-sfj fired and intercepted; order#1→#2 auto-increment verified; preview-toast on print verified; no boot/compile errors."},
+  "seed_data_creation": "None.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The env-var migration of QUOTE_ENDPOINT is shipped and verified. Future iterations can rely on process.env.EXPO_PUBLIC_QUOTE_API_URL resolving to https://expertdevelopers.in/generate-8858-quote-for-sfj at build time. Web-preview CORS on that endpoint remains the ONLY reason preview-quote shows 'Failed to fetch' in browser tests — this is expected and does not block the order# flow (preview.tsx uses the route param, not the quote response, when bumping storage). Real Expo Go on a phone or a built APK does not have CORS and will populate preview-quote correctly. All testIDs from iteration_3 still resolve unchanged.",
+  "rca_of_issue": "N/A — no defect introduced by the migration. Repro evidence captured: Playwright request listener observed `REQUEST: POST https://expertdevelopers.in/generate-8858-quote-for-sfj` immediately after tapping generate-button, proving the env var value is what the bundle uses."
+}
