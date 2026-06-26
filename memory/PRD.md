@@ -27,12 +27,12 @@ A small Bluetooth-printer companion for the **Shree Food Junction** cloud kitche
 The local FastAPI backend is no longer part of the user flow (kept only as a no-op for the platform).
 
 ## Bluetooth printer (58mm, ESC/POS)
-- Library: `react-native-bluetooth-escpos-printer@0.0.5` (installed in `package.json`).
-- Real BT activates **only inside a built APK/IPA** — Expo Go preview shows a clearly-labelled "Demo mode" with 2 demo devices.
-- Android permissions declared in `app.json` → `expo.android.permissions`:
-  `BLUETOOTH`, `BLUETOOTH_ADMIN`, `BLUETOOTH_CONNECT`, `BLUETOOTH_SCAN`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`.
-- iOS Bluetooth usage descriptions in `expo.ios.infoPlist`.
-- `src/lib/printer.ts` requests Android 12+ runtime permissions lazily on scan.
+- Library: **`react-native-bluetooth-classic@1.73.0-rc.17`** + Expo config plugin **`with-rn-bluetooth-classic@1.0.5`** (modern, AndroidX, supports Expo SDK 54 + New Architecture). Replaced the dead `react-native-bluetooth-escpos-printer` (RN 0.59 / pre-AndroidX / JCenter).
+- The adapter at `src/lib/printer.ts` builds raw **ESC/POS byte sequences** (init / align / bold / feed / cut + Latin-1 text) and ships them via `device.write(base64, "base64")`. ESC/POS works on any generic 58mm Chinese thermal printer.
+- Native vs simulated detection uses `NativeModules.RNBluetoothClassic` (NOT a feature-typeof check) because the library's JS layer exports methods even when the native module isn't linked. The Expo Go preview therefore correctly falls back to "Demo mode" with 2 demo devices.
+- Real BT activates **only inside a built APK/IPA** — Expo Go preview shows a clearly-labelled "Demo mode (Expo Go preview)" banner.
+- Permissions: `with-rn-bluetooth-classic` plugin auto-injects iOS `NSBluetoothAlwaysUsageDescription` + `NSBluetoothPeripheralUsageDescription`. Android permissions are also declared explicitly in `app.json` → `expo.android.permissions`: `BLUETOOTH`, `BLUETOOTH_ADMIN`, `BLUETOOTH_CONNECT`, `BLUETOOTH_SCAN`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`.
+- `src/lib/printer.ts` requests Android 12+ runtime BT permissions on scan.
 
 ## Storage (AsyncStorage)
 - `sfj:order_number` — persists the running order #.
