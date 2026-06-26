@@ -103,9 +103,9 @@ export default function PrinterSetupScreen() {
       <View style={styles.banner}>
         <Ionicons name="information-circle-outline" size={18} color={theme.color.onSurfaceSecondary} />
         <Text style={styles.bannerText}>
-          {isNativePrinterAvailable
+          {isNativePrinterAvailable()
             ? "Scanning nearby Bluetooth thermal printers (58mm)."
-            : "Demo mode in Expo Go. Real Bluetooth printing turns on automatically once you build the APK."}
+            : "Demo mode (Expo Go preview). Real Bluetooth printing activates in the built APK."}
         </Text>
       </View>
 

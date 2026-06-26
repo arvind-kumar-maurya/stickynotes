@@ -3,7 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 
 import { theme } from "@/src/lib/theme";
-import { getGeminiKey, getKitchenName, getPrinter } from "@/src/lib/storage";
+import { getPrinter } from "@/src/lib/storage";
 import { isPrinterConnected } from "@/src/lib/printer";
 
 export default function Index() {
@@ -11,23 +11,12 @@ export default function Index() {
 
   useEffect(() => {
     (async () => {
-      const [key, kitchen, printer] = await Promise.all([
-        getGeminiKey(),
-        getKitchenName(),
-        getPrinter(),
-      ]);
-
-      if (!key || !kitchen) {
-        router.replace("/setup");
-        return;
-      }
-
+      const printer = await getPrinter();
       const connected = await isPrinterConnected(printer);
       if (!printer || !connected) {
         router.replace("/printer-setup");
         return;
       }
-
       router.replace("/home");
     })();
   }, []);

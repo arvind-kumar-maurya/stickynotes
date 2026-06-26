@@ -12,22 +12,22 @@ import {
   TouchableWithoutFeedback,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { theme } from "@/src/lib/theme";
 import {
-  getKitchenName,
   getOrderNumber,
   setOrderNumber as saveOrderNumber,
   getPrinter,
   SavedPrinter,
+  KITCHEN_NAME,
 } from "@/src/lib/storage";
 import { tap } from "@/src/lib/haptics";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [kitchen, setKitchen] = useState("");
   const [customer, setCustomer] = useState("");
   const [order, setOrder] = useState<number>(1);
   const [printer, setPrinterState] = useState<SavedPrinter | null>(null);
@@ -35,8 +35,7 @@ export default function HomeScreen() {
 
   useEffect(() => {
     (async () => {
-      const [k, n, p] = await Promise.all([getKitchenName(), getOrderNumber(), getPrinter()]);
-      if (k) setKitchen(k);
+      const [n, p] = await Promise.all([getOrderNumber(), getPrinter()]);
       setOrder(n || 1);
       setPrinterState(p);
     })();
@@ -82,21 +81,33 @@ export default function HomeScreen() {
             contentContainerStyle={{ paddingBottom: 160 }}
           >
             <View style={styles.header}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.eyebrow}>{kitchen || "Your Kitchen"}</Text>
-                <Text style={styles.headerTitle}>Who is this{"\n"}order for?</Text>
+              <View style={styles.brandRow}>
+                <Image
+                  source={require("../assets/images/sfj-logo.png")}
+                  style={styles.logo}
+                  contentFit="contain"
+                  testID="home-logo"
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.brandName} testID="home-brand-name">
+                    {KITCHEN_NAME}
+                  </Text>
+                  <Text style={styles.brandTag}>Good Food, Happy Mood</Text>
+                </View>
+                <Pressable
+                  testID="open-settings"
+                  onPress={() => {
+                    tap();
+                    router.push("/settings");
+                  }}
+                  hitSlop={10}
+                  style={styles.iconBtn}
+                >
+                  <Ionicons name="settings-outline" size={22} color={theme.color.onSurface} />
+                </Pressable>
               </View>
-              <Pressable
-                testID="open-settings"
-                onPress={() => {
-                  tap();
-                  router.push("/settings");
-                }}
-                hitSlop={10}
-                style={styles.iconBtn}
-              >
-                <Ionicons name="settings-outline" size={22} color={theme.color.onSurface} />
-              </Pressable>
+
+              <Text style={styles.headerTitle}>Who is this{"\n"}order for?</Text>
             </View>
 
             <View style={styles.printerChip} testID="printer-chip">
@@ -188,21 +199,33 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.color.surface },
   header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.lg,
   },
-  iconBtn: { padding: theme.spacing.sm },
-  eyebrow: {
-    color: theme.color.brandSecondary,
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing.md,
+    marginBottom: theme.spacing.xl,
+  },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: 12,
+  },
+  brandName: {
+    color: theme.color.onSurface,
+    fontFamily: theme.font.display,
+    fontSize: theme.scale.lg,
+    fontWeight: "800",
+  },
+  brandTag: {
+    color: theme.color.muted,
     fontFamily: theme.font.text,
     fontSize: theme.scale.sm,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 1.5,
-    marginBottom: theme.spacing.sm,
+    marginTop: 2,
   },
+  iconBtn: { padding: theme.spacing.sm },
   headerTitle: {
     color: theme.color.onSurface,
     fontFamily: theme.font.display,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -14,12 +14,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { theme } from "@/src/lib/theme";
 import { generateQuote } from "@/src/lib/api";
 import {
-  getGeminiKey,
-  getKitchenName,
   getPrinter,
   setOrderNumber as saveOrderNumber,
   getOrderNumber,
   SavedPrinter,
+  KITCHEN_NAME,
 } from "@/src/lib/storage";
 import {
   isPrinterConnected,
@@ -27,14 +26,6 @@ import {
   isNativePrinterAvailable,
 } from "@/src/lib/printer";
 import { tap, medium, success, error as errHaptic } from "@/src/lib/haptics";
-
-type ToneTag = "warm" | "funny" | "motivational";
-
-const TONE_LABEL: Record<ToneTag, string> = {
-  warm: "Warm note",
-  funny: "Cheeky one-liner",
-  motivational: "Pep talk",
-};
 
 export default function PreviewScreen() {
   const router = useRouter();
@@ -44,12 +35,10 @@ export default function PreviewScreen() {
 
   const [loading, setLoading] = useState(true);
   const [quote, setQuote] = useState<string>("");
-  const [tone, setTone] = useState<ToneTag>("warm");
   const [err, setErr] = useState<string | null>(null);
   const [printer, setPrinterState] = useState<SavedPrinter | null>(null);
   const [printing, setPrinting] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const kitchenRef = useRef<string>("");
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -60,24 +49,14 @@ export default function PreviewScreen() {
     setErr(null);
     setLoading(true);
     try {
-      const [key, kitchen, p] = await Promise.all([
-        getGeminiKey(),
-        getKitchenName(),
-        getPrinter(),
-      ]);
+      const p = await getPrinter();
       setPrinterState(p);
-      kitchenRef.current = kitchen || "Kitchen";
-      if (!key || !kitchen) {
-        throw new Error("Missing setup. Please complete setup first.");
-      }
       const res = await generateQuote({
         customer_name: customerName,
         order_number: orderNumber,
-        kitchen_name: kitchen,
-        gemini_api_key: key,
+        kitchen_name: KITCHEN_NAME,
       });
       setQuote(res.quote);
-      setTone((res.tone as ToneTag) || "warm");
       success();
     } catch (e: any) {
       setErr(e?.message || "Failed to generate quote");
@@ -100,7 +79,6 @@ export default function PreviewScreen() {
     medium();
     setPrinting(true);
     try {
-      // Make sure printer connection is still alive.
       const ok = await isPrinterConnected(printer);
       if (!printer || !ok) {
         showToast("No printer connected. Opening printer setup...");
@@ -108,12 +86,11 @@ export default function PreviewScreen() {
         return;
       }
       const result = await printReceipt({
-        kitchenName: kitchenRef.current,
+        kitchenName: KITCHEN_NAME,
         customerName,
         orderNumber,
         quote,
       });
-      // Auto-increment order number after a successful print
       const cur = await getOrderNumber();
       await saveOrderNumber(Math.max(cur, orderNumber) + 1);
       success();
@@ -129,6 +106,15 @@ export default function PreviewScreen() {
       setPrinting(false);
     }
   };
+
+  // Split quote into body + signoff (last line if it starts with — or --)
+  const lines = quote.split("\n").map((l) => l.trim()).filter(Boolean);
+  let body = quote;
+  let signoff = `— ${KITCHEN_NAME}`;
+  if (lines.length > 1 && /^[—–-]/.test(lines[lines.length - 1])) {
+    signoff = lines[lines.length - 1];
+    body = lines.slice(0, -1).join("\n");
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
@@ -149,11 +135,8 @@ export default function PreviewScreen() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.toneRow}>
-          <View style={styles.toneChip} testID="preview-tone">
-            <View style={styles.dot} />
-            <Text style={styles.toneChipText}>{TONE_LABEL[tone] || "Note"}</Text>
-          </View>
+        <View style={styles.orderRow}>
+          <Text style={styles.kitchenChip}>{KITCHEN_NAME}</Text>
           <Text style={styles.orderTag} testID="preview-order">
             Order #{orderNumber}
           </Text>
@@ -177,11 +160,9 @@ export default function PreviewScreen() {
                   Dear {customerName.split(" ")[0]},
                 </Text>
                 <Text style={styles.noteQuote} testID="preview-quote">
-                  {quote}
+                  {body}
                 </Text>
-                <Text style={styles.noteSignoff}>
-                  — {kitchenRef.current}
-                </Text>
+                <Text style={styles.noteSignoff}>{signoff}</Text>
               </>
             )}
           </View>
@@ -233,7 +214,7 @@ export default function PreviewScreen() {
       {toast ? (
         <View style={styles.toast} testID="preview-toast" pointerEvents="none">
           <Ionicons
-            name={isNativePrinterAvailable ? "checkmark-circle" : "information-circle"}
+            name={isNativePrinterAvailable() ? "checkmark-circle" : "information-circle"}
             size={16}
             color={theme.color.onSurfaceInverse}
           />
@@ -265,35 +246,20 @@ const styles = StyleSheet.create({
     paddingBottom: 160,
     alignItems: "center",
   },
-  toneRow: {
+  orderRow: {
     width: "100%",
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: theme.spacing.lg,
   },
-  toneChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.sm,
-    backgroundColor: theme.color.surfaceSecondary,
-    borderRadius: theme.radius.pill,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: theme.color.brandSecondary,
-  },
-  toneChipText: {
-    color: theme.color.onSurfaceSecondary,
+  kitchenChip: {
+    color: theme.color.brandSecondary,
     fontFamily: theme.font.text,
-    fontWeight: "700",
+    fontWeight: "800",
     fontSize: theme.scale.sm,
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
   },
   orderTag: {
     color: theme.color.muted,

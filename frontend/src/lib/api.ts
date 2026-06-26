@@ -1,26 +1,26 @@
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+// Direct call to the Shree Food Junction quote API. No backend, no Gemini key.
+const QUOTE_ENDPOINT = "https://expertdevelopers.in/generate-8858-quote-for-sfj";
 
 export type GenerateQuoteResponse = {
-  id: string;
   quote: string;
-  tone: string;
   customer_name: string;
   order_number: number;
   kitchen_name: string;
-  created_at: string;
 };
 
 export async function generateQuote(input: {
   customer_name: string;
   order_number: number;
   kitchen_name: string;
-  gemini_api_key: string;
 }): Promise<GenerateQuoteResponse> {
-  if (!BACKEND_URL) throw new Error("Backend URL missing");
-  const res = await fetch(`${BACKEND_URL}/api/generate-quote`, {
+  const res = await fetch(QUOTE_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      kitchen_name: input.kitchen_name,
+      customer_name: input.customer_name,
+      order_number: input.order_number,
+    }),
   });
   const txt = await res.text();
   let data: any;
@@ -29,8 +29,15 @@ export async function generateQuote(input: {
   } catch {
     throw new Error(`Server error (${res.status}): ${txt.slice(0, 200)}`);
   }
-  if (!res.ok) {
-    throw new Error(data?.detail || `Server error (${res.status})`);
+  if (!res.ok || data?.success === false) {
+    throw new Error(data?.message || data?.error || `Server error (${res.status})`);
   }
-  return data;
+  const quote = (data?.quote ?? data?.data?.quote ?? "").toString().trim();
+  if (!quote) throw new Error("Empty quote from server");
+  return {
+    quote,
+    customer_name: input.customer_name,
+    order_number: input.order_number,
+    kitchen_name: input.kitchen_name,
+  };
 }

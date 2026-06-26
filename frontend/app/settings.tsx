@@ -1,64 +1,25 @@
 import { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
+import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
 import { theme } from "@/src/lib/theme";
-import {
-  getGeminiKey,
-  setGeminiKey,
-  getKitchenName,
-  setKitchenName,
-  getPrinter,
-  setPrinter,
-  SavedPrinter,
-} from "@/src/lib/storage";
+import { getPrinter, setPrinter, SavedPrinter, KITCHEN_NAME } from "@/src/lib/storage";
 import { disconnectPrinter, isNativePrinterAvailable } from "@/src/lib/printer";
-import { tap, success } from "@/src/lib/haptics";
+import { tap } from "@/src/lib/haptics";
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const [kitchen, setKitchen] = useState("");
-  const [key, setKey] = useState("");
-  const [showKey, setShowKey] = useState(false);
   const [printer, setPrinterState] = useState<SavedPrinter | null>(null);
-  const [savedHint, setSavedHint] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const [k, n, p] = await Promise.all([getGeminiKey(), getKitchenName(), getPrinter()]);
-      if (k) setKey(k);
-      if (n) setKitchen(n);
+      const p = await getPrinter();
       setPrinterState(p);
     })();
   }, []);
-
-  const onSaveKitchen = async () => {
-    const v = kitchen.trim();
-    if (!v) return;
-    await setKitchenName(v);
-    setSavedHint("Kitchen name saved");
-    success();
-    setTimeout(() => setSavedHint(null), 1500);
-  };
-  const onSaveKey = async () => {
-    const v = key.trim();
-    if (v.length < 10) return;
-    await setGeminiKey(v);
-    setSavedHint("Gemini key saved");
-    success();
-    setTimeout(() => setSavedHint(null), 1500);
-  };
 
   const onDisconnect = async () => {
     tap();
@@ -74,123 +35,75 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      <View style={styles.header}>
+        <Pressable
+          testID="settings-back"
+          onPress={() => router.back()}
+          hitSlop={10}
+          style={styles.iconBtn}
+        >
+          <Ionicons name="chevron-back" size={22} color={theme.color.onSurface} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Settings</Text>
+        <View style={{ width: 38 }} />
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Pressable
-            testID="settings-back"
-            onPress={() => router.back()}
-            hitSlop={10}
-            style={styles.iconBtn}
-          >
-            <Ionicons name="chevron-back" size={22} color={theme.color.onSurface} />
-          </Pressable>
-          <Text style={styles.headerTitle}>Settings</Text>
-          <View style={{ width: 38 }} />
+        <View style={styles.brandCard}>
+          <Image
+            source={require("../assets/images/sfj-logo.png")}
+            style={styles.logo}
+            contentFit="contain"
+          />
+          <Text style={styles.brandName}>{KITCHEN_NAME}</Text>
+          <Text style={styles.brandTag}>Good Food, Happy Mood</Text>
         </View>
 
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.section}>API Configuration</Text>
+        <Text style={styles.section}>Printer</Text>
 
-          <Text style={styles.label}>Kitchen name</Text>
-          <View style={styles.inputWrap}>
-            <Ionicons name="restaurant-outline" size={18} color={theme.color.muted} />
-            <TextInput
-              testID="settings-kitchen-input"
-              value={kitchen}
-              onChangeText={setKitchen}
-              style={styles.input}
-              autoCapitalize="words"
-            />
-            <Pressable
-              testID="settings-save-kitchen"
-              onPress={onSaveKitchen}
-              style={styles.smallBtn}
-              hitSlop={6}
-            >
-              <Text style={styles.smallBtnText}>Save</Text>
-            </Pressable>
+        <View style={styles.printerRow}>
+          <View style={styles.iconCircle}>
+            <Ionicons name="print" size={18} color={theme.color.onBrandPrimary} />
           </View>
-
-          <Text style={[styles.label, { marginTop: theme.spacing.xl }]}>Gemini API key</Text>
-          <View style={styles.inputWrap}>
-            <Ionicons name="key-outline" size={18} color={theme.color.muted} />
-            <TextInput
-              testID="settings-gemini-input"
-              value={key}
-              onChangeText={setKey}
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry={!showKey}
-            />
-            <Pressable
-              testID="settings-toggle-key"
-              onPress={() => setShowKey((s) => !s)}
-              hitSlop={6}
-              style={{ marginRight: theme.spacing.sm }}
-            >
-              <Ionicons
-                name={showKey ? "eye-off-outline" : "eye-outline"}
-                size={18}
-                color={theme.color.muted}
-              />
-            </Pressable>
-            <Pressable
-              testID="settings-save-key"
-              onPress={onSaveKey}
-              style={styles.smallBtn}
-              hitSlop={6}
-            >
-              <Text style={styles.smallBtnText}>Save</Text>
-            </Pressable>
-          </View>
-
-          {savedHint ? (
-            <Text testID="settings-saved-hint" style={styles.savedHint}>
-              {savedHint}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.printerName} testID="settings-printer-name">
+              {printer ? printer.name : "No printer connected"}
             </Text>
-          ) : null}
-
-          <Text style={[styles.section, { marginTop: theme.spacing.xxl }]}>Printer</Text>
-
-          <View style={styles.printerRow}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="print" size={18} color={theme.color.onBrandPrimary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.printerName}>{printer ? printer.name : "No printer connected"}</Text>
-              <Text style={styles.printerSub}>
-                {isNativePrinterAvailable ? "58mm Bluetooth ESC/POS" : "Demo mode in Expo Go"}
-              </Text>
-            </View>
-            <Pressable
-              testID="settings-change-printer"
-              onPress={onChangePrinter}
-              style={styles.smallBtn}
-            >
-              <Text style={styles.smallBtnText}>{printer ? "Change" : "Connect"}</Text>
-            </Pressable>
+            <Text style={styles.printerSub}>
+              {isNativePrinterAvailable() ? "58mm Bluetooth ESC/POS" : "Demo mode (Expo Go preview)"}
+            </Text>
           </View>
+          <Pressable
+            testID="settings-change-printer"
+            onPress={onChangePrinter}
+            style={styles.smallBtn}
+          >
+            <Text style={styles.smallBtnText}>{printer ? "Change" : "Connect"}</Text>
+          </Pressable>
+        </View>
 
-          {printer ? (
-            <Pressable
-              testID="settings-disconnect"
-              onPress={onDisconnect}
-              style={({ pressed }) => [styles.dangerBtn, pressed && { opacity: 0.85 }]}
-            >
-              <Ionicons name="unlink-outline" size={16} color={theme.color.error} />
-              <Text style={styles.dangerText}>Disconnect printer</Text>
-            </Pressable>
-          ) : null}
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {printer ? (
+          <Pressable
+            testID="settings-disconnect"
+            onPress={onDisconnect}
+            style={({ pressed }) => [styles.dangerBtn, pressed && { opacity: 0.85 }]}
+          >
+            <Ionicons name="unlink-outline" size={16} color={theme.color.error} />
+            <Text style={styles.dangerText}>Disconnect printer</Text>
+          </Pressable>
+        ) : null}
+
+        <Text style={[styles.section, { marginTop: theme.spacing.xxl }]}>About</Text>
+        <View style={styles.aboutCard}>
+          <Text style={styles.aboutText}>
+            Sticky-note quotes are generated by the Shree Food Junction quote service. Print to a
+            58mm Bluetooth thermal printer to delight every customer.
+          </Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -212,6 +125,28 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   scroll: { padding: theme.spacing.xl, paddingBottom: theme.spacing.xxxl },
+  brandCard: {
+    alignItems: "center",
+    paddingVertical: theme.spacing.xl,
+    backgroundColor: theme.color.surfaceSecondary,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    marginBottom: theme.spacing.xxl,
+  },
+  logo: { width: 96, height: 96, borderRadius: 16, marginBottom: theme.spacing.md },
+  brandName: {
+    color: theme.color.onSurface,
+    fontFamily: theme.font.display,
+    fontSize: theme.scale["2xl"],
+    fontWeight: "800",
+  },
+  brandTag: {
+    color: theme.color.muted,
+    fontFamily: theme.font.text,
+    fontSize: theme.scale.sm,
+    marginTop: 4,
+  },
   section: {
     fontFamily: theme.font.text,
     color: theme.color.brandSecondary,
@@ -220,50 +155,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: "uppercase",
     marginBottom: theme.spacing.md,
-  },
-  label: {
-    fontFamily: theme.font.text,
-    fontSize: theme.scale.sm,
-    color: theme.color.onSurfaceSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
-    marginBottom: theme.spacing.sm,
-    fontWeight: "700",
-  },
-  inputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.spacing.md,
-    backgroundColor: theme.color.surfaceSecondary,
-    borderRadius: theme.radius.md,
-    borderWidth: 1,
-    borderColor: theme.color.border,
-    paddingHorizontal: theme.spacing.lg,
-  },
-  input: {
-    flex: 1,
-    fontFamily: theme.font.text,
-    fontSize: theme.scale.lg,
-    color: theme.color.onSurface,
-    paddingVertical: 12,
-  },
-  smallBtn: {
-    backgroundColor: theme.color.brandPrimary,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 8,
-    borderRadius: theme.radius.pill,
-  },
-  smallBtnText: {
-    color: theme.color.onBrandPrimary,
-    fontFamily: theme.font.text,
-    fontWeight: "800",
-    fontSize: theme.scale.sm,
-  },
-  savedHint: {
-    marginTop: theme.spacing.md,
-    color: theme.color.success,
-    fontFamily: theme.font.text,
-    fontSize: theme.scale.sm,
   },
   printerRow: {
     flexDirection: "row",
@@ -295,6 +186,18 @@ const styles = StyleSheet.create({
     fontSize: theme.scale.sm,
     marginTop: 2,
   },
+  smallBtn: {
+    backgroundColor: theme.color.brandPrimary,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 8,
+    borderRadius: theme.radius.pill,
+  },
+  smallBtnText: {
+    color: theme.color.onBrandPrimary,
+    fontFamily: theme.font.text,
+    fontWeight: "800",
+    fontSize: theme.scale.sm,
+  },
   dangerBtn: {
     marginTop: theme.spacing.lg,
     flexDirection: "row",
@@ -312,5 +215,18 @@ const styles = StyleSheet.create({
     fontFamily: theme.font.text,
     fontWeight: "800",
     fontSize: theme.scale.base,
+  },
+  aboutCard: {
+    backgroundColor: theme.color.surfaceSecondary,
+    borderRadius: theme.radius.md,
+    borderWidth: 1,
+    borderColor: theme.color.border,
+    padding: theme.spacing.lg,
+  },
+  aboutText: {
+    color: theme.color.onSurfaceSecondary,
+    fontFamily: theme.font.text,
+    fontSize: theme.scale.base,
+    lineHeight: 22,
   },
 });
